@@ -9,10 +9,11 @@ import { realtimeService } from "@/services/realtimeService";
 import { audioManager } from "@/services/audioManager";
 import { useEffect } from "react";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
+import StaffManagement from "./pages/StaffManagement";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import Appointments from "./pages/Appointments";
-import Scheduling from "./pages/Scheduling";
 import Inventory from "./pages/Inventory";
 import History from "./pages/History";
 import Reports from "./pages/Reports";
@@ -32,20 +33,13 @@ function RealtimeInitializer() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      // Initialize realtime service when user logs in
       realtimeService.init();
-
-      // Initialize audio manager with user preferences
       audioManager.setEnabled(soundEnabled);
       audioManager.setVolume(soundVolume);
-
-      // Request notification permission
       useNotificationStore.getState().requestPermission();
     } else {
-      // Disconnect realtime when user logs out
       realtimeService.disconnect();
     }
-
     return () => {
       realtimeService.disconnect();
     };
@@ -57,26 +51,27 @@ function RealtimeInitializer() {
 const App = () => {
   console.log("App component rendering");
   return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <RealtimeInitializer />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
-          <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
-          <Route path="/scheduling" element={<ProtectedRoute><Scheduling /></ProtectedRoute>} />
-          <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-          <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <RealtimeInitializer />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/staff" element={<ProtectedRoute><StaffManagement /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+            <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 

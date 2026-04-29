@@ -1,20 +1,26 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Inbox, Calendar, Package, FileBarChart, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Inbox, Package, FileBarChart, LogOut } from "lucide-react";
 import { useAdminStore } from "@/store/adminStore";
 
-const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/clients", icon: Users, label: "Clients & Pets" },
-  { to: "/appointments", icon: Inbox, label: "Appointments" },
-  { to: "/scheduling", icon: Calendar, label: "Scheduling" },
-  { to: "/inventory", icon: Package, label: "Inventory" },
-  { to: "/history", icon: FileBarChart, label: "History" },
-  { to: "/reports", icon: FileBarChart, label: "Reports" },
+const allNavItems = [
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", adminOnly: false },
+  { to: "/clients", icon: Users, label: "Clients & Pets", adminOnly: false },
+  { to: "/appointments", icon: Inbox, label: "Appointments", adminOnly: false },
+  { to: "/inventory", icon: Package, label: "Inventory", adminOnly: false },
+  { to: "/history", icon: FileBarChart, label: "History", adminOnly: false },
+  { to: "/reports", icon: FileBarChart, label: "Reports", adminOnly: true },
+  { to: "/staff", icon: Users, label: "Staff Management", adminOnly: true },
 ];
 
 export default function Sidebar() {
   const logout = useAdminStore((s) => s.logout);
+  const role = useAdminStore((s) => s.role);
+  const email = useAdminStore((s) => s.email);
   const navigate = useNavigate();
+
+  const navItems = allNavItems.filter(
+    (item) => !item.adminOnly || role === "admin"
+  );
 
   const handleLogout = () => {
     logout();
@@ -26,6 +32,24 @@ export default function Sidebar() {
       <div className="p-4 border-b border-sidebar-hover">
         <h2 className="text-sidebar-fg font-semibold text-sm tracking-wide uppercase">Navigation</h2>
       </div>
+
+      {/* Profile Section */}
+      <div className="p-4 border-b border-sidebar-hover flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          {email ? email[0].toUpperCase() : "?"}
+        </div>
+        <div className="overflow-hidden">
+          <p className="text-sidebar-fg text-sm font-medium truncate">{email}</p>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+            role === "admin"
+              ? "bg-blue-100 text-blue-700"
+              : "bg-green-100 text-green-700"
+          }`}>
+            {role === "admin" ? "Admin" : "Staff"}
+          </span>
+        </div>
+      </div>
+
       <nav className="flex-1 py-2 space-y-0.5 px-2">
         {navItems.map((item) => (
           <NavLink
@@ -44,6 +68,7 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
       <div className="p-2 border-t border-sidebar-hover">
         <button
           onClick={handleLogout}

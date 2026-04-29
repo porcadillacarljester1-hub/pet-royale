@@ -9,7 +9,7 @@ import { Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function History() {
-  const { data: history = [] } = useQuery({
+  const { data: history = [], isLoading } = useQuery({
     queryKey: ["history"],
     queryFn: fetchHistory,
   });
@@ -30,10 +30,12 @@ export default function History() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Confirmed Services</CardTitle>
+          <CardTitle className="text-lg">Completed Services</CardTitle>
         </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm">Loading history...</p>
+          ) : history.length === 0 ? (
             <p className="text-muted-foreground text-sm">No history yet.</p>
           ) : (
             <Table>
@@ -42,8 +44,8 @@ export default function History() {
                   <TableHead>Client</TableHead>
                   <TableHead>Pet</TableHead>
                   <TableHead>Service</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
+                  <TableHead>Date Completed</TableHead>
+                  <TableHead>Time Completed</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -51,11 +53,11 @@ export default function History() {
                 {history.map((h) => (
                   <TableRow key={h.id}>
                     <TableCell className="font-medium">{h.client_name}</TableCell>
-                    <TableCell>{h.pet_name}</TableCell>
+                    <TableCell>{h.pet_name} ({h.pet_species})</TableCell>
                     <TableCell>{h.service}</TableCell>
-                    <TableCell>{h.date}</TableCell>
-                    <TableCell>{h.time}</TableCell>
-                    <TableCell><Badge className="bg-success text-success-foreground">{h.status}</Badge></TableCell>
+                    <TableCell>{h.scheduled_date || h.requested_date}</TableCell>
+                    <TableCell>{h.scheduled_time || 'No time set'}</TableCell>
+                    <TableCell><Badge className="bg-green-500 text-white">Completed</Badge></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

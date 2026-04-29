@@ -3,18 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 // Core data structure
 export interface Appointment {
   id: string;
-  client_id: string;
+  client_id?: string;
   client_name: string;
-  pet_id: string;
+  pet_id?: string;
   pet_name: string;
   pet_species: string;
   service: string;
   requested_date: string;
   scheduled_date?: string;
   scheduled_time?: string;
-  status: 'incoming' | 'pending_client' | 'confirmed' | 'completed';
+  status: 'incoming' | 'confirmed' | 'completed';
   created_at?: string;
-  updated_at?: string;
 }
 
 /**
@@ -25,7 +24,7 @@ export const fetchAppointments = async (): Promise<Appointment[]> => {
     const { data, error } = await supabase
       .from('appointments')
       .select('*')
-      .neq('status', 'completed') // Don't show completed ones here
+      .neq('status', 'completed')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -37,15 +36,15 @@ export const fetchAppointments = async (): Promise<Appointment[]> => {
 };
 
 /**
- * 2. FETCH HISTORY (The function History.tsx was missing!)
+ * 2. FETCH HISTORY
  */
 export const fetchHistory = async (): Promise<Appointment[]> => {
   try {
     const { data, error } = await supabase
       .from('appointments')
       .select('*')
-      .eq('status', 'completed') // Only show completed records
-      .order('updated_at', { ascending: false });
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     return (data || []) as Appointment[];
@@ -61,7 +60,11 @@ export const fetchHistory = async (): Promise<Appointment[]> => {
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at'>) => {
   const { data, error } = await supabase
     .from('appointments')
-    .insert([appointment])
+    .insert([{
+      ...appointment,
+      client_id: appointment.client_id ?? '',
+      pet_id: appointment.pet_id ?? '',
+    }])
     .select()
     .single();
   if (error) throw error;
@@ -69,23 +72,7 @@ export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'c
 };
 
 /**
- * 4. SEND SCHEDULE TO CLIENT
- */
-export const sendAppointmentSchedule = async (id: string, date: string, time: string) => {
-  const { error } = await supabase
-    .from('appointments')
-    .update({ 
-      scheduled_date: date,
-      scheduled_time: time,
-      status: 'pending_client' 
-    })
-    .eq('id', id);
-  if (error) throw error;
-  return true;
-};
-
-/**
- * 5. CONFIRM APPOINTMENT
+ * 4. CONFIRM APPOINTMENT
  */
 export const confirmAppointment = async (id: string) => {
   const { error } = await supabase
@@ -97,12 +84,24 @@ export const confirmAppointment = async (id: string) => {
 };
 
 /**
- * 6. COMPLETE APPOINTMENT (Moves it to History)
+ * 5. COMPLETE APPOINTMENT (Moves it to History)
  */
 export const completeAppointment = async (id: string) => {
+  const now = new Date();
+  const date = now.toISOString().split('T')[0];
+  const time = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+
   const { error } = await supabase
     .from('appointments')
-    .update({ status: 'completed' })
+    .update({
+      status: 'completed',
+      scheduled_date: date,
+      scheduled_time: time,
+    })
     .eq('id', id);
   if (error) throw error;
   return true;

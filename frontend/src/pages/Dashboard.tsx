@@ -5,7 +5,6 @@ import { fetchInventory } from "@/api/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarClock, Bell, AlertTriangle } from "lucide-react";
-import { RealtimeTester } from "@/components/RealtimeTester";
 
 export default function Dashboard() {
   const { data: appointments = [] } = useQuery({
@@ -55,7 +54,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 gap-6 mb-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Critical Stock Items</CardTitle>
@@ -80,8 +79,6 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-
-        <RealtimeTester />
       </div>
     </AdminLayout>
   );
