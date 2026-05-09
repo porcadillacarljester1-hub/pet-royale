@@ -40,20 +40,20 @@ export default function Clients() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Pets</TableHead>
-                <TableHead>Registered</TableHead>
+                <TableHead>Registered Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((client) => (
                 <TableRow key={client.id} className="cursor-pointer hover:bg-accent/50" onClick={() => setSelectedClient(client)}>
                   <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell>{client.contact}</TableCell>
+                  <TableCell>{(client as any).phone || '--'}</TableCell>
                   <TableCell>{client.email}</TableCell>
                   <TableCell><Badge variant="secondary">{client.pets.length}</Badge></TableCell>
-                  <TableCell>{client.registered_date}</TableCell>
+                  <TableCell>{new Date(client.created_at).toLocaleDateString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

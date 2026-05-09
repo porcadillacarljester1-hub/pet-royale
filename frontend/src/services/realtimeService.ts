@@ -1,72 +1,56 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useNotificationStore } from "@/store/notificationStore";
-import { useQueryClient } from "@tanstack/react-query";
+
+type QueryInvalidator = (queryKey: string[]) => void;
 
 class RealtimeService {
   private channels: any[] = [];
   private isInitialized = false;
+  private invalidateQuery: QueryInvalidator = () => {};
+
+  // Call this from a React component to pass queryClient.invalidateQueries
+  setQueryInvalidator(fn: QueryInvalidator) {
+    this.invalidateQuery = fn;
+  }
 
   init() {
-    if (this.isInitialized) {
-      console.log('⚠️ Realtime service already initialized');
-      return;
-    }
+    if (this.isInitialized) return;
     this.isInitialized = true;
-
-    console.log('🚀 Initializing realtime service...');
     this.setupAppointmentRealtime();
     this.setupInventoryRealtime();
     this.setupClientRealtime();
-
-    console.log('✅ Realtime service initialized');
   }
 
   private setupAppointmentRealtime() {
     const channel = supabase
       .channel('appointments_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'appointments',
-        },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'appointments' },
         (payload) => {
-          console.log('New appointment:', payload.new);
           const appointment = payload.new as any;
-
           useNotificationStore.getState().addNotification({
             type: 'appointment',
             title: 'New Appointment Request',
             message: `${appointment.client_name} requested ${appointment.service} for ${appointment.pet_name}`,
             data: appointment,
           });
-
-          // Invalidate queries to refresh data
-          const queryClient = useQueryClient();
-          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          this.invalidateQuery(['appointments']);
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'appointments',
-        },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'appointments' },
         (payload) => {
-          console.log('Appointment updated:', payload.new);
           const appointment = payload.new as any;
           const oldAppointment = payload.old as any;
 
-          // Only notify if status changed
           if (appointment.status !== oldAppointment.status) {
             let title = 'Appointment Updated';
             let message = `Appointment for ${appointment.pet_name} status changed to ${appointment.status}`;
 
             if (appointment.status === 'confirmed') {
               title = 'Appointment Confirmed';
-              message = `${appointment.client_name} confirmed their appointment`;
+              message = `${appointment.client_name}'s appointment has been confirmed`;
+            } else if (appointment.status === 'completed') {
+              title = 'Appointment Completed';
+              message = `${appointment.client_name}'s appointment has been completed`;
             }
 
             useNotificationStore.getState().addNotification({
@@ -76,10 +60,7 @@ class RealtimeService {
               data: appointment,
             });
           }
-
-          // Invalidate queries
-          const queryClient = useQueryClient();
-          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          this.invalidateQuery(['appointments']);
         }
       )
       .subscribe();
@@ -90,36 +71,12 @@ class RealtimeService {
   private setupInventoryRealtime() {
     const channel = supabase
       .channel('inventory_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'inventory',
-        },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' },
         (payload) => {
-          console.log('🔄 Inventory UPDATE event received:', {
-            new: payload.new,
-            old: payload.old,
-            eventType: payload.eventType
-          });
-
           const item = payload.new as any;
           const oldItem = payload.old as any;
 
-          console.log('📊 Stock comparison:', {
-            itemName: item.name,
-            oldStock: oldItem.stock,
-            newStock: item.stock,
-            wasAbove5: oldItem.stock > 5,
-            isNowLow: item.stock <= 5,
-            wasAbove0: oldItem.stock > 0,
-            isNowZero: item.stock === 0
-          });
-
-          // Check for low stock
           if (item.stock <= 5 && oldItem.stock > 5) {
-            console.log('⚠️ Triggering LOW STOCK notification for:', item.name);
             useNotificationStore.getState().addNotification({
               type: 'inventory',
               title: 'Low Stock Alert',
@@ -128,9 +85,7 @@ class RealtimeService {
             });
           }
 
-          // Check for out of stock
           if (item.stock === 0 && oldItem.stock > 0) {
-            console.log('🚫 Triggering OUT OF STOCK notification for:', item.name);
             useNotificationStore.getState().addNotification({
               type: 'inventory',
               title: 'Out of Stock',
@@ -139,9 +94,7 @@ class RealtimeService {
             });
           }
 
-          // Invalidate queries
-          const queryClient = useQueryClient();
-          queryClient.invalidateQueries({ queryKey: ['inventory'] });
+          this.invalidateQuery(['inventory']);
         }
       )
       .subscribe((status) => {
@@ -154,27 +107,16 @@ class RealtimeService {
   private setupClientRealtime() {
     const channel = supabase
       .channel('clients_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'clients',
-        },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' },
         (payload) => {
-          console.log('New client:', payload.new);
           const client = payload.new as any;
-
           useNotificationStore.getState().addNotification({
             type: 'client',
             title: 'New Client Registered',
             message: `${client.name} has registered as a new client`,
             data: client,
           });
-
-          // Invalidate queries
-          const queryClient = useQueryClient();
-          queryClient.invalidateQueries({ queryKey: ['clients'] });
+          this.invalidateQuery(['clients']);
         }
       )
       .subscribe();
@@ -183,12 +125,9 @@ class RealtimeService {
   }
 
   disconnect() {
-    this.channels.forEach(channel => {
-      supabase.removeChannel(channel);
-    });
+    this.channels.forEach(channel => supabase.removeChannel(channel));
     this.channels = [];
     this.isInitialized = false;
-    console.log('Realtime service disconnected');
   }
 }
 

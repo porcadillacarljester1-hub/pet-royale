@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -30,9 +30,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function RealtimeInitializer() {
   const isLoggedIn = useAdminStore((s) => s.isLoggedIn);
   const { soundEnabled, soundVolume } = useNotificationStore();
+  const queryClient = useQueryClient(); // ✅ called inside a component
 
   useEffect(() => {
     if (isLoggedIn) {
+      // ✅ pass queryClient to service before init
+      realtimeService.setQueryInvalidator((queryKey) => {
+        queryClient.invalidateQueries({ queryKey });
+      });
       realtimeService.init();
       audioManager.setEnabled(soundEnabled);
       audioManager.setVolume(soundVolume);
@@ -43,13 +48,12 @@ function RealtimeInitializer() {
     return () => {
       realtimeService.disconnect();
     };
-  }, [isLoggedIn, soundEnabled, soundVolume]);
+  }, [isLoggedIn, soundEnabled, soundVolume, queryClient]);
 
   return null;
 }
 
 const App = () => {
-  console.log("App component rendering");
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

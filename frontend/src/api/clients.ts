@@ -1,20 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Client, Pet, ClientWithPets } from "@/types";
 
-export async function fetchClients(): Promise<Client[]> {
-  const { data, error } = await supabase
-    .from("clients")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return data;
-}
-
 export async function fetchPetsByClient(clientId: string): Promise<Pet[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("pets")
     .select("*")
-    .eq("client_id", clientId)
+    .eq("owner_id", clientId)
     .order("name");
   if (error) throw error;
   return data;
@@ -27,13 +18,13 @@ export async function fetchClientsWithPets(): Promise<ClientWithPets[]> {
     .order("name");
   if (cErr) throw cErr;
 
-  const { data: pets, error: pErr } = await supabase
+  const { data: pets, error: pErr } = await (supabase as any)
     .from("pets")
     .select("*");
   if (pErr) throw pErr;
 
   return clients.map((c: Client) => ({
     ...c,
-    pets: pets.filter((p: Pet) => p.client_id === c.id),
+    pets: pets.filter((p: any) => p.owner_id === c.id),
   }));
 }

@@ -1,39 +1,14 @@
-// Notification sounds - paths to files in public directory
 const notificationSounds = {
-  default: "/notification.mp3",
-  alert: "/alert.mp3",
-  success: "/success.mp3",
+  default: 880,   // A5
+  alert: 440,     // A4 (lower, more urgent)
+  success: 1046,  // C6 (higher, positive)
 };
 
 export type SoundType = keyof typeof notificationSounds;
 
 class AudioManager {
-  private audioContext: AudioContext | null = null;
-  private sounds: Map<string, HTMLAudioElement> = new Map();
   private enabled: boolean = true;
   private volume: number = 0.5;
-
-  constructor() {
-    this.initAudioContext();
-    this.preloadSounds();
-  }
-
-  private initAudioContext() {
-    try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
-      console.warn('Web Audio API not supported');
-    }
-  }
-
-  private preloadSounds() {
-    Object.entries(notificationSounds).forEach(([key, src]) => {
-      const audio = new Audio(src);
-      audio.preload = 'auto';
-      audio.volume = this.volume;
-      this.sounds.set(key, audio);
-    });
-  }
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
@@ -41,21 +16,28 @@ class AudioManager {
 
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume));
-    this.sounds.forEach(audio => {
-      audio.volume = this.volume;
-    });
   }
 
   play(soundType: SoundType = 'default') {
     if (!this.enabled) return;
 
-    const audio = this.sounds.get(soundType);
-    if (audio) {
-      // Reset audio to beginning in case it's already playing
-      audio.currentTime = 0;
-      audio.play().catch(e => {
-        console.warn('Could not play notification sound:', e);
-      });
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.frequency.value = notificationSounds[soundType];
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(this.volume * 0.3, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.3);
+    } catch (e) {
+      console.warn('Could not play sound:', e);
     }
   }
 
