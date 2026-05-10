@@ -30,19 +30,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function RealtimeInitializer() {
   const isLoggedIn = useAdminStore((s) => s.isLoggedIn);
   const { soundEnabled, soundVolume } = useNotificationStore();
-  const queryClient = useQueryClient(); // ✅ called inside a component
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (isLoggedIn) {
-      // ✅ pass queryClient to service before init
+      console.log('🚀 Initializing realtime service...');
       realtimeService.setQueryInvalidator((queryKey) => {
         queryClient.invalidateQueries({ queryKey });
       });
       realtimeService.init();
+      console.log('✅ Realtime service initialized');
+      
       audioManager.setEnabled(soundEnabled);
       audioManager.setVolume(soundVolume);
+      console.log('🔊 Audio enabled:', soundEnabled);
+      
       useNotificationStore.getState().requestPermission();
+      console.log('📢 Notification permission requested');
     } else {
+      console.log('❌ Not logged in, disconnecting realtime');
       realtimeService.disconnect();
     }
     return () => {

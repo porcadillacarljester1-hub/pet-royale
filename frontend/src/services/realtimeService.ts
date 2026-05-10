@@ -8,7 +8,6 @@ class RealtimeService {
   private isInitialized = false;
   private invalidateQuery: QueryInvalidator = () => {};
 
-  // Call this from a React component to pass queryClient.invalidateQueries
   setQueryInvalidator(fn: QueryInvalidator) {
     this.invalidateQuery = fn;
   }
@@ -18,7 +17,7 @@ class RealtimeService {
     this.isInitialized = true;
     this.setupAppointmentRealtime();
     this.setupInventoryRealtime();
-    this.setupClientRealtime();
+    this.setupNotificationRealtime();
   }
 
   private setupAppointmentRealtime() {
@@ -26,40 +25,13 @@ class RealtimeService {
       .channel('appointments_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'appointments' },
         (payload) => {
-          const appointment = payload.new as any;
-          useNotificationStore.getState().addNotification({
-            type: 'appointment',
-            title: 'New Appointment Request',
-            message: `${appointment.client_name} requested ${appointment.service} for ${appointment.pet_name}`,
-            data: appointment,
-          });
+          console.log('🔔 New appointment:', payload.new);
           this.invalidateQuery(['appointments']);
         }
       )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'appointments' },
         (payload) => {
-          const appointment = payload.new as any;
-          const oldAppointment = payload.old as any;
-
-          if (appointment.status !== oldAppointment.status) {
-            let title = 'Appointment Updated';
-            let message = `Appointment for ${appointment.pet_name} status changed to ${appointment.status}`;
-
-            if (appointment.status === 'confirmed') {
-              title = 'Appointment Confirmed';
-              message = `${appointment.client_name}'s appointment has been confirmed`;
-            } else if (appointment.status === 'completed') {
-              title = 'Appointment Completed';
-              message = `${appointment.client_name}'s appointment has been completed`;
-            }
-
-            useNotificationStore.getState().addNotification({
-              type: 'appointment',
-              title,
-              message,
-              data: appointment,
-            });
-          }
+          console.log('📝 Appointment updated:', payload.new);
           this.invalidateQuery(['appointments']);
         }
       )
@@ -73,27 +45,7 @@ class RealtimeService {
       .channel('inventory_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' },
         (payload) => {
-          const item = payload.new as any;
-          const oldItem = payload.old as any;
-
-          if (item.stock <= 5 && oldItem.stock > 5) {
-            useNotificationStore.getState().addNotification({
-              type: 'inventory',
-              title: 'Low Stock Alert',
-              message: `${item.name} is running low (${item.stock} remaining)`,
-              data: item,
-            });
-          }
-
-          if (item.stock === 0 && oldItem.stock > 0) {
-            useNotificationStore.getState().addNotification({
-              type: 'inventory',
-              title: 'Out of Stock',
-              message: `${item.name} is now out of stock`,
-              data: item,
-            });
-          }
-
+          console.log('📦 Inventory updated:', payload.new);
           this.invalidateQuery(['inventory']);
         }
       )
@@ -104,19 +56,19 @@ class RealtimeService {
     this.channels.push(channel);
   }
 
-  private setupClientRealtime() {
+  // Listen for new notifications created by database triggers
+  private setupNotificationRealtime() {
     const channel = supabase
-      .channel('clients_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' },
+      .channel('notifications_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
-          const client = payload.new as any;
-          useNotificationStore.getState().addNotification({
-            type: 'client',
-            title: 'New Client Registered',
-            message: `${client.name} has registered as a new client`,
-            data: client,
-          });
-          this.invalidateQuery(['clients']);
+          const notification = payload.new as any;
+          console.log('🎵 Playing notification sound for:', notification.title);
+          
+          // Play sound when notification is created
+          useNotificationStore.getState().playSound(
+            notification.type === 'inventory' ? 'alert' : 'default'
+          );
         }
       )
       .subscribe();
