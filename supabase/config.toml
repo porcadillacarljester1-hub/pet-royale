@@ -1,0 +1,22 @@
+
+[functions.manage-staff]
+enabled = true
+verify_jwt = false
+import_map = "./functions/manage-staff/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/manage-staff/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/manage-staff/*.html" ]
+
+[functions.activate-invite]
+enabled = true
+verify_jwt = false
+import_map = "./functions/activate-invite/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/activate-invite/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/activate-invite/*.html" ]

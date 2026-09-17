@@ -1,417 +1,394 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAdminStore } from "@/store/adminStore";
-import logo from "@/assets/PetRoyaleLogo.jpg";
-import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import staffPetPhoto from "@/assets/pet_royale_staff_pet_login.png";
+import { useNavigate } from "react-router-dom";
+import {
+  LockIcon, MailIcon, EyeIcon, EyeOffIcon, ArrowLeftIcon,
+  ArrowRight, MailCheck, AlertCircle, Loader2,
+} from "lucide-react";
 
-const CrownIcon = ({ size = 20, color = "#f5c518" }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path
-      d="M2 18h20M4 18L2 8l5 4 5-8 5 8 5-4-2 10H4z"
-      stroke={color}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+type Step = "login" | "forgot-email" | "forgot-sent";
+
+const TEAL = "#0F766E";
+const NAVY = "#1E3A5F";
+
+function Mark({ size = 34 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true" className="shrink-0">
+      <rect x="2" y="7" width="36" height="31" rx="10" fill={TEAL} />
+      <path d="M11 10 L14.5 13.5 L20 5.5 L25.5 13.5 L29 10 L27.5 16 H12.5 L11 10Z" fill={NAVY} />
+      <g fill="#FFFFFF">
+        <ellipse cx="20" cy="30.5" rx="6.2" ry="5.2" />
+        <ellipse cx="13.4" cy="24.6" rx="2.9" ry="3.5" />
+        <ellipse cx="17" cy="20.4" rx="2.5" ry="3.1" />
+        <ellipse cx="23" cy="20.4" rx="2.5" ry="3.1" />
+        <ellipse cx="26.6" cy="24.6" rx="2.9" ry="3.5" />
+      </g>
+    </svg>
+  );
+}
+
+function ErrorSlot({ message }: { message: string | null }) {
+  return (
+    <div className="min-h-[52px] mb-1" aria-live="polite">
+      {message && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-3.5 py-2.5"
+        >
+          <AlertCircle className="h-4 w-4 text-[#DC2626] shrink-0 mt-px" />
+          <p className="text-[13px] leading-snug text-[#B91C1C]">{message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const FIELD_BASE =
+  "w-full pl-11 py-3 rounded-lg border bg-white text-[15px] text-[#1E293B] placeholder:text-[#94A3B8] " +
+  "outline-none transition-[border-color,box-shadow] duration-150";
+const FIELD_OK =
+  "border-[#CBD5E1] focus:border-[#0F766E] focus:ring-[3px] focus:ring-[#0F766E]/15";
+const FIELD_ERR =
+  "border-[#DC2626] focus:border-[#DC2626] focus:ring-[3px] focus:ring-[#DC2626]/12";
 
 export default function Login() {
+  const [step, setStep] = useState<Step>("login");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: boolean; password?: boolean }>({});
+
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
   const login = useAdminStore((s) => s.login);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please fill in all fields.");
+    setFormError(null);
+
+    const errs: { email?: boolean; password?: boolean } = {};
+    if (!email.trim()) errs.email = true;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = true;
+    if (!password) errs.password = true;
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      setFormError(
+        !email.trim() || !password
+          ? "Please enter both your email and password."
+          : "That doesn't look like a valid email address."
+      );
       return;
     }
+
+    setFieldErrors({});
     setIsLoading(true);
-    const success = await login(email, password);
-    setIsLoading(false);
-    if (success) {
-      navigate("/dashboard");
-    } else {
-      toast.error("Invalid credentials. Please try again.");
+    try {
+      const result = await login(email.trim(), password);
+      if (result.success) {
+        navigate("/dashboard");
+      } else {
+        setFormError(result.error || "Invalid email or password.");
+        setFieldErrors({ email: true, password: true });
+      }
+    } catch {
+      setFormError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleSendResetLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+
+    if (!resetEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail.trim())) {
+      setResetError("Please enter a valid email address.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setStep("forgot-sent");
+    } catch {
+      setResetError("Couldn't send the reset link. Please try again in a moment.");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const backToLogin = () => {
+    setStep("login");
+    setResetEmail("");
+    setResetError(null);
+  };
+
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap');
+    // min-h-screen rather than fixed inset-0: on a short viewport the form
+    // stays reachable instead of being clipped with no way to scroll.
+    <div className="min-h-screen flex bg-white">
 
-        .si-root {
-          min-height: 100vh;
-          display: flex;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          background: #f4f6fb;
-        }
+      {/* ============ FORM ============ */}
+      <div className="w-full lg:w-[52%] xl:w-[46%] flex flex-col px-6 sm:px-10 lg:px-16 py-8 lg:py-10">
 
-        .si-panel {
-          width: 44%;
-          background: #1a2368;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 2.75rem;
-          position: relative;
-          overflow: hidden;
-          flex-shrink: 0;
-        }
-        .si-panel-grid {
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-          background-size: 48px 48px;
-        }
-        .si-panel-glow {
-          position: absolute;
-          bottom: -100px;
-          left: -100px;
-          width: 400px;
-          height: 400px;
-          border-radius: 50%;
-          background: radial-gradient(circle, #f5c518 0%, transparent 60%);
-          opacity: 0.06;
-        }
-        .si-panel-glow2 {
-          position: absolute;
-          top: -60px;
-          right: -60px;
-          width: 250px;
-          height: 250px;
-          border-radius: 50%;
-          background: radial-gradient(circle, #f5c518 0%, transparent 60%);
-          opacity: 0.04;
-        }
-        .si-panel-dots {
-          position: absolute;
-          top: 50%;
-          right: -20px;
-          transform: translateY(-50%);
-          display: grid;
-          grid-template-columns: repeat(3, 6px);
-          gap: 8px;
-        }
-        .si-panel-dots span {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: rgba(255,255,255,0.07);
-        }
-
-        .si-panel-logo {
-          position: relative;
-          z-index: 1;
-        }
-        .si-panel-logo-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 9px;
-          background: rgba(255,255,255,0.07);
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 10px;
-          padding: 9px 13px;
-        }
-        .si-panel-logo-text .w1 {
-          display: block;
-          font-family: 'Playfair Display', serif;
-          font-size: 1rem;
-          font-weight: 600;
-          color: #f5c518;
-          line-height: 1;
-          letter-spacing: -0.01em;
-        }
-        .si-panel-logo-text .w2 {
-          display: block;
-          font-size: 0.58rem;
-          color: rgba(255,255,255,0.4);
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          margin-top: 3px;
-        }
-
-        .si-panel-copy {
-          position: relative;
-          z-index: 1;
-        }
-        .si-panel-copy h2 {
-          font-family: 'Playfair Display', serif;
-          font-size: 2rem;
-          font-weight: 500;
-          color: #f5c518;
-          line-height: 1.25;
-          margin: 0 0 0.75rem;
-          letter-spacing: -0.01em;
-        }
-        .si-panel-copy p {
-          font-size: 0.8rem;
-          color: rgba(255,255,255,0.38);
-          line-height: 1.7;
-          margin: 0;
-        }
-        .si-panel-copy .qt {
-          font-size: 0.73rem;
-          color: rgba(255,255,255,0.22);
-          font-style: italic;
-          margin-top: 0.5rem;
-          display: block;
-        }
-
-        .si-right {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-        }
-        .si-box { width: 100%; max-width: 380px; }
-
-        .si-form-brand {
-          display: flex;
-          align-items: center;
-          gap: 0.7rem;
-          margin-bottom: 2.25rem;
-        }
-        .si-form-crown-box {
-          width: 40px;
-          height: 40px;
-          background: #1a2368;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .si-form-brand-text .s1 {
-          display: block;
-          font-family: 'Playfair Display', serif;
-          font-size: 1rem;
-          font-weight: 600;
-          color: #1a2368;
-          line-height: 1;
-        }
-        .si-form-brand-text .s2 {
-          display: block;
-          font-size: 0.62rem;
-          letter-spacing: 0.13em;
-          text-transform: uppercase;
-          color: #8a97b0;
-          margin-top: 3px;
-        }
-
-        .si-heading {
-          font-family: 'Playfair Display', serif;
-          font-size: 1.85rem;
-          font-weight: 500;
-          color: #1a2368;
-          margin: 0 0 0.3rem;
-          letter-spacing: -0.02em;
-        }
-        .si-subheading {
-          font-size: 0.82rem;
-          color: #8a97b0;
-          margin: 0 0 1.85rem;
-        }
-
-        .si-field { margin-bottom: 1rem; }
-        .si-field label {
-          display: block;
-          font-size: 0.7rem;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          font-weight: 600;
-          color: #4a5568;
-          margin-bottom: 0.4rem;
-        }
-        .si-input-wrap { position: relative; }
-        .si-field input {
-          width: 100%;
-          padding: 0.68rem 0.85rem;
-          border: 1.5px solid #dde3ef;
-          border-radius: 8px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.875rem;
-          color: #1a2368;
-          background: #fff;
-          outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s;
-          box-sizing: border-box;
-        }
-        .si-field input.has-toggle { padding-right: 2.6rem; }
-        .si-field input::placeholder { color: #bcc5d8; }
-        .si-field input:focus {
-          border-color: #1a2368;
-          box-shadow: 0 0 0 3px rgba(26,35,104,0.09);
-        }
-        .si-eye {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          outline: none;
-          box-shadow: none;
-          cursor: pointer;
-          padding: 0;
-          margin: 0;
-          color: #9aa5be;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          line-height: 1;
-          transition: color 0.15s;
-        }
-        .si-eye:hover { color: #1a2368; }
-        .si-eye:focus { outline: none; }
-
-        .si-sep { height: 1px; background: #e8ecf4; margin: 1.25rem 0; }
-
-        .si-btn {
-          width: 100%;
-          padding: 0.75rem;
-          background: #1a2368;
-          color: #fff;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.82rem;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: background 0.15s, transform 0.1s;
-        }
-        .si-btn:hover:not(:disabled) { background: #222d80; }
-        .si-btn:active:not(:disabled) { transform: scale(0.99); }
-        .si-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .si-foot {
-          margin-top: 1.1rem;
-          text-align: center;
-          font-size: 0.8rem;
-          color: #8a97b0;
-        }
-        .si-foot a {
-          color: #1a2368;
-          font-weight: 600;
-          cursor: pointer;
-          text-decoration: none;
-        }
-        .si-foot a:hover { text-decoration: underline; }
-
-        @media (max-width: 680px) { .si-panel { display: none; } }
-      `}</style>
-
-      <div className="si-root">
-        <div className="si-panel">
-          <div className="si-panel-grid" />
-          <div className="si-panel-glow" />
-          <div className="si-panel-glow2" />
-          <div className="si-panel-dots">
-            {Array.from({ length: 18 }).map((_, i) => <span key={i} />)}
+        <header className="flex items-center gap-3 shrink-0">
+          <Mark size={34} />
+          <div className="min-w-0">
+            <p
+              className="font-bold text-[17px] leading-tight"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: NAVY }}
+            >
+              Pet Royale
+            </p>
+            <p className="text-[11px] text-[#64748B] leading-tight">We care for you and your pets</p>
           </div>
+        </header>
 
-          <div className="si-panel-logo">
-            <div className="si-panel-logo-badge">
-              <CrownIcon size={22} color="#f5c518" />
-              <div className="si-panel-logo-text">
-                <span className="w1">Pet Royale'</span>
-                <span className="w2">Clinic &amp; Veterinary</span>
-              </div>
-            </div>
-          </div>
+        <main className="flex-1 flex flex-col justify-center py-10">
+          <div className="w-full max-w-[380px] mx-auto lg:mx-0">
 
-          <div className="si-panel-copy">
-            <h2>Where every pet is royalty.</h2>
-            <p>A secure portal for Pet Royale admins and staff members.</p>
-            <span className="qt">"We Care For You and Your Pets"</span>
-          </div>
-        </div>
+            {/* ── SIGN IN ── */}
+            {step === "login" && (
+              <>
+                <h1
+                  className="text-[28px] sm:text-[32px] font-bold leading-[1.15] mb-2.5"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", color: NAVY }}
+                >
+                  Sign in to your account
+                </h1>
+                <p className="text-[#64748B] text-[14.5px] leading-relaxed mb-7">
+                  Manage appointments, records and reporting for the clinic.
+                </p>
 
-        <div className="si-right">
-          <div className="si-box">
-            <div className="si-form-brand">
-              <div className="si-form-crown-box">
-                <CrownIcon size={20} color="#f5c518" />
-              </div>
-              <div className="si-form-brand-text">
-                <span className="s1">Pet Royale'</span>
-                <span className="s2">Staff Portal</span>
-              </div>
-            </div>
+                <ErrorSlot message={formError} />
 
-            <h1 className="si-heading">Sign in</h1>
-            <p className="si-subheading">Access your account — admin or staff</p>
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                  <div>
+                    <label htmlFor="email" className="block text-[13px] font-semibold mb-1.5" style={{ color: NAVY }}>
+                      Email address
+                    </label>
+                    <div className="relative">
+                      <MailIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[17px] w-[17px] text-[#94A3B8] pointer-events-none" />
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: false }));
+                        }}
+                        placeholder="you@clinic.com"
+                        autoComplete="email"
+                        aria-invalid={!!fieldErrors.email}
+                        disabled={isLoading}
+                        className={`${FIELD_BASE} pr-4 ${fieldErrors.email ? FIELD_ERR : FIELD_OK} disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]`}
+                      />
+                    </div>
+                  </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="si-field">
-                <label htmlFor="si-email">Email address</label>
-                <input
-                  id="si-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@gmail.com"
-                />
-              </div>
+                  <div>
+                    <label htmlFor="password" className="block text-[13px] font-semibold mb-1.5" style={{ color: NAVY }}>
+                      Password
+                    </label>
+                    <div className="relative">
+                      <LockIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[17px] w-[17px] text-[#94A3B8] pointer-events-none" />
+                      <input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: false }));
+                        }}
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        aria-invalid={!!fieldErrors.password}
+                        disabled={isLoading}
+                        className={`${FIELD_BASE} pr-11 ${fieldErrors.password ? FIELD_ERR : FIELD_OK} disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        disabled={isLoading}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#1E293B] hover:bg-[#F1F5F9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40 transition-colors disabled:opacity-40"
+                      >
+                        {showPassword ? <EyeOffIcon className="h-[17px] w-[17px]" /> : <EyeIcon className="h-[17px] w-[17px]" />}
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="si-field">
-                <label htmlFor="si-password">Password</label>
-                <div className="si-input-wrap">
-                  <input
-                    id="si-password"
-                    type={showPassword ? "text" : "password"}
-                    className="has-toggle"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
+                  {/* "Remember me" was removed: the checkbox state was never
+                      read anywhere, and Supabase persists the session either
+                      way — so it promised a choice the system doesn't have. */}
+                  <div className="flex justify-end pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => { setStep("forgot-email"); setFormError(null); }}
+                      className="text-[13px] font-semibold rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40"
+                      style={{ color: TEAL }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
                   <button
-                    type="button"
-                    className="si-eye"
-                    onClick={() => setShowPassword((v) => !v)}
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full h-[46px] rounded-lg text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0F766E] disabled:cursor-not-allowed"
+                    style={{ backgroundColor: isLoading ? "#5FA9A2" : TEAL }}
+                    onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.backgroundColor = "#0B5D56"; }}
+                    onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.backgroundColor = TEAL; }}
                   >
-                    {showPassword ? (
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                        <line x1="1" y1="1" x2="23" y2="23" />
-                      </svg>
+                    {isLoading ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</>
                     ) : (
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
+                      <>Sign in <ArrowRight className="h-4 w-4" /></>
                     )}
                   </button>
+                </form>
+
+                <p className="text-[13px] text-[#64748B] mt-7 leading-relaxed">
+                  Accounts are created by your clinic administrator. Contact them if you need access.
+                </p>
+              </>
+            )}
+
+            {/* ── FORGOT: ENTER EMAIL ── */}
+            {step === "forgot-email" && (
+              <>
+                <button
+                  onClick={backToLogin}
+                  className="inline-flex items-center gap-1.5 text-[13.5px] text-[#64748B] hover:text-[#1E293B] mb-7 transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40"
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                  Back to sign in
+                </button>
+
+                <h1
+                  className="text-[26px] font-bold leading-tight mb-2.5"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", color: NAVY }}
+                >
+                  Reset your password
+                </h1>
+                <p className="text-[#64748B] text-[14.5px] leading-relaxed mb-7">
+                  Enter your email and we'll send a link to set a new password.
+                </p>
+
+                <ErrorSlot message={resetError} />
+
+                <form onSubmit={handleSendResetLink} noValidate className="space-y-4">
+                  <div>
+                    <label htmlFor="reset-email" className="block text-[13px] font-semibold mb-1.5" style={{ color: NAVY }}>
+                      Email address
+                    </label>
+                    <div className="relative">
+                      <MailIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[17px] w-[17px] text-[#94A3B8] pointer-events-none" />
+                      <input
+                        id="reset-email"
+                        type="email"
+                        value={resetEmail}
+                        onChange={(e) => { setResetEmail(e.target.value); if (resetError) setResetError(null); }}
+                        placeholder="you@clinic.com"
+                        autoComplete="email"
+                        aria-invalid={!!resetError}
+                        disabled={resetLoading}
+                        className={`${FIELD_BASE} pr-4 ${resetError ? FIELD_ERR : FIELD_OK} disabled:bg-[#F8FAFC]`}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full h-[46px] rounded-lg text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0F766E] disabled:cursor-not-allowed"
+                    style={{ backgroundColor: resetLoading ? "#5FA9A2" : TEAL }}
+                    onMouseEnter={(e) => { if (!resetLoading) e.currentTarget.style.backgroundColor = "#0B5D56"; }}
+                    onMouseLeave={(e) => { if (!resetLoading) e.currentTarget.style.backgroundColor = TEAL; }}
+                  >
+                    {resetLoading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>) : "Send reset link"}
+                  </button>
+                </form>
+              </>
+            )}
+
+            {/* ── FORGOT: SENT ── */}
+            {step === "forgot-sent" && (
+              <>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: "#F0FDFA" }}>
+                  <MailCheck className="h-5 w-5" style={{ color: TEAL }} />
                 </div>
-              </div>
 
-              <div className="si-sep" />
+                <h1
+                  className="text-[26px] font-bold leading-tight mb-2.5"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", color: NAVY }}
+                >
+                  Check your email
+                </h1>
+                <p className="text-[#64748B] text-[14.5px] leading-relaxed mb-7">
+                  If an account exists for{" "}
+                  <span className="font-semibold" style={{ color: NAVY }}>{resetEmail}</span>, we've sent a
+                  link to set a new password. It expires in one hour.
+                </p>
 
-              <button type="submit" className="si-btn" disabled={isLoading}>
-                {isLoading ? "Signing in…" : "Sign In"}
-              </button>
-            </form>
-
-            <p className="si-foot">
-              New staff member?{" "}
-              <a onClick={() => navigate("/register")}>Register here</a>
-            </p>
+                <button
+                  onClick={backToLogin}
+                  className="w-full h-[46px] rounded-lg border border-[#CBD5E1] font-semibold text-[15px] hover:bg-[#F8FAFC] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0F766E]"
+                  style={{ color: NAVY }}
+                >
+                  Back to sign in
+                </button>
+              </>
+            )}
           </div>
-        </div>
+        </main>
+
+        <footer className="shrink-0 pt-6 border-t border-[#E2E8F0]">
+          <p className="text-[12px] text-[#94A3B8]">
+            © {new Date().getFullYear()} Pet Royale Clinic and Veterinary Services
+          </p>
+        </footer>
       </div>
-    </>
+
+      {/* ============ PHOTO ============ */}
+      {/* The two floating cards, the dashed circle and the sparkle are gone.
+          One of the cards read "Supabase-backed authentication… role-based
+          access control" — developer vocabulary aimed at a receptionist
+          trying to sign in, competing with the form for attention. */}
+      <div className="hidden lg:block relative flex-1 overflow-hidden bg-[#F8FAFC]">
+        <img
+          src={staffPetPhoto}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to top, rgba(30,58,95,.72) 0%, rgba(30,58,95,.18) 45%, rgba(30,58,95,0) 75%)" }}
+        />
+        <blockquote className="absolute bottom-0 left-0 right-0 p-12 xl:p-16">
+          <p
+            className="text-white text-[22px] xl:text-[26px] leading-snug max-w-[440px]"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            Every appointment, record and payment — in one place.
+          </p>
+          <p className="text-white/65 text-[13.5px] mt-3">Pet Royale Clinic and Veterinary Services</p>
+        </blockquote>
+      </div>
+    </div>
   );
 }

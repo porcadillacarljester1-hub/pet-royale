@@ -1,8 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
-import { useNotificationStore } from "@/store/notificationStore";
 
 type QueryInvalidator = (queryKey: string[]) => void;
 
+/**
+ * Keeps the dashboard in step with the database without anyone
+ * refreshing.
+ *
+ * Two channels: appointments and inventory. Notifications used to have
+ * a third, but it existed only to play a sound — and sounds were
+ * removed. The badge on the bell has its own subscription in
+ * NotificationBell, which is where the count lives.
+ */
 class RealtimeService {
   private channels: any[] = [];
   private isInitialized = false;
@@ -15,24 +23,28 @@ class RealtimeService {
   init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
-    this.setupAppointmentRealtime();
-    this.setupInventoryRealtime();
-    this.setupNotificationRealtime();
+    this.watchAppointments();
+    this.watchInventory();
   }
 
-  private setupAppointmentRealtime() {
+  private watchAppointments() {
     const channel = supabase
-      .channel('appointments_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'appointments' },
-        (payload) => {
-          console.log('🔔 New appointment:', payload.new);
-          this.invalidateQuery(['appointments']);
-        }
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'appointments' },
-        (payload) => {
-          console.log('📝 Appointment updated:', payload.new);
-          this.invalidateQuery(['appointments']);
+      .channel("appointments_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments" },
+        () => {
+          /* The schedule's key is ["appointments-range", from, to], and
+             React Query matches by prefix — so invalidating
+             ["appointments"] matched nothing and the table never
+             refreshed when a booking arrived.
+
+             INSERT and UPDATE are handled together because the response
+             is the same either way: refetch. Separate handlers only
+             meant two paths doing one thing. */
+          this.invalidateQuery(["appointments-range"]);
+          this.invalidateQuery(["dashboard-data"]);
+          this.invalidateQuery(["invoice-summary"]);
         }
       )
       .subscribe();
@@ -40,35 +52,15 @@ class RealtimeService {
     this.channels.push(channel);
   }
 
-  private setupInventoryRealtime() {
+  private watchInventory() {
     const channel = supabase
-      .channel('inventory_changes')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' },
-        (payload) => {
-          console.log('📦 Inventory updated:', payload.new);
-          this.invalidateQuery(['inventory']);
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Inventory realtime subscription status:', status);
-      });
-
-    this.channels.push(channel);
-  }
-
-  // Listen for new notifications created by database triggers
-  private setupNotificationRealtime() {
-    const channel = supabase
-      .channel('notifications_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' },
-        (payload) => {
-          const notification = payload.new as any;
-          console.log('🎵 Playing notification sound for:', notification.title);
-          
-          // Play sound when notification is created
-          useNotificationStore.getState().playSound(
-            notification.type === 'inventory' ? 'alert' : 'default'
-          );
+      .channel("inventory_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "inventory" },
+        () => {
+          this.invalidateQuery(["inventory"]);
+          this.invalidateQuery(["dashboard-data"]);
         }
       )
       .subscribe();
@@ -77,7 +69,7 @@ class RealtimeService {
   }
 
   disconnect() {
-    this.channels.forEach(channel => supabase.removeChannel(channel));
+    this.channels.forEach((channel) => supabase.removeChannel(channel));
     this.channels = [];
     this.isInitialized = false;
   }

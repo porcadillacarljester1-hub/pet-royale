@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -10,203 +10,386 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.17"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
-      appointment_history: {
-        Row: {
-          client_name: string
-          created_at: string
-          date: string
-          id: string
-          pet_name: string
-          service: string
-          status: string
-          time: string
-        }
-        Insert: {
-          client_name: string
-          created_at?: string
-          date: string
-          id?: string
-          pet_name: string
-          service: string
-          status?: string
-          time?: string
-        }
-        Update: {
-          client_name?: string
-          created_at?: string
-          date?: string
-          id?: string
-          pet_name?: string
-          service?: string
-          status?: string
-          time?: string
-        }
-        Relationships: []
-      }
       appointments: {
         Row: {
           client_id: string
           client_name: string
-          created_at: string
+          created_at: string | null
           id: string
-          pet_id: string
+          payment_reference: string | null
+          payment_status: string | null
+          pet_id: string | null
           pet_name: string
           pet_species: string
-          requested_date: string
+          requested_date: string | null
           scheduled_date: string | null
           scheduled_time: string | null
           service: string
-          status: Database["public"]["Enums"]["appointment_status"]
-          updated_at: string
+          status: string | null
         }
         Insert: {
           client_id: string
           client_name: string
-          created_at?: string
+          created_at?: string | null
           id?: string
-          pet_id: string
+          payment_reference?: string | null
+          payment_status?: string | null
+          pet_id?: string | null
           pet_name: string
           pet_species: string
-          requested_date: string
+          requested_date?: string | null
           scheduled_date?: string | null
           scheduled_time?: string | null
           service: string
-          status?: Database["public"]["Enums"]["appointment_status"]
-          updated_at?: string
+          status?: string | null
         }
         Update: {
           client_id?: string
           client_name?: string
-          created_at?: string
+          created_at?: string | null
           id?: string
-          pet_id?: string
+          payment_reference?: string | null
+          payment_status?: string | null
+          pet_id?: string | null
           pet_name?: string
           pet_species?: string
-          requested_date?: string
+          requested_date?: string | null
           scheduled_date?: string | null
           scheduled_time?: string | null
           service?: string
-          status?: Database["public"]["Enums"]["appointment_status"]
-          updated_at?: string
+          status?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "appointments_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_pet_id_fkey"
-            columns: ["pet_id"]
-            isOneToOne: false
-            referencedRelation: "pets"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       clients: {
         Row: {
-          contact: string
-          created_at: string
-          email: string
+          created_at: string | null
+          email: string | null
           id: string
           name: string
-          registered_date: string
-          updated_at: string
+          phone: string | null
         }
         Insert: {
-          contact: string
-          created_at?: string
-          email: string
+          created_at?: string | null
+          email?: string | null
           id?: string
           name: string
-          registered_date?: string
-          updated_at?: string
+          phone?: string | null
         }
         Update: {
-          contact?: string
-          created_at?: string
-          email?: string
+          created_at?: string | null
+          email?: string | null
           id?: string
           name?: string
-          registered_date?: string
-          updated_at?: string
+          phone?: string | null
         }
         Relationships: []
       }
       inventory: {
         Row: {
-          category: string
-          created_at: string
+          category: string | null
+          created_at: string | null
           id: string
-          image_key: string
+          image_key: string | null
           name: string
-          stock: number
-          updated_at: string
+          stock: number | null
         }
         Insert: {
-          category: string
-          created_at?: string
+          category?: string | null
+          created_at?: string | null
           id?: string
-          image_key?: string
+          image_key?: string | null
           name: string
-          stock?: number
-          updated_at?: string
+          stock?: number | null
         }
         Update: {
-          category?: string
-          created_at?: string
+          category?: string | null
+          created_at?: string | null
           id?: string
-          image_key?: string
+          image_key?: string | null
           name?: string
-          stock?: number
-          updated_at?: string
+          stock?: number | null
+        }
+        Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          id: string
+          invoice_id: string
+          quantity: number
+          service_id: string | null
+          service_name: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          invoice_id: string
+          quantity?: number
+          service_id?: string | null
+          service_name: string
+          subtotal: number
+          unit_price: number
+        }
+        Update: {
+          id?: string
+          invoice_id?: string
+          quantity?: number
+          service_id?: string | null
+          service_name?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          appointment_id: string
+          checkout_url: string | null
+          created_at: string | null
+          id: string
+          paid_at: string | null
+          payment_reference: string | null
+          status: string
+          total_amount: number
+        }
+        Insert: {
+          appointment_id: string
+          checkout_url?: string | null
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          status?: string
+          total_amount?: number
+        }
+        Update: {
+          appointment_id?: string
+          checkout_url?: string | null
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          status?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
       pets: {
         Row: {
-          age: string
-          breed: string
-          client_id: string
-          created_at: string
+          age: number | null
+          breed: string | null
+          color: string | null
+          created_at: string | null
+          gender: string | null
           id: string
           name: string
+          neutered: string | null
+          owner_id: string
           species: string
+          weight: number | null
         }
         Insert: {
-          age?: string
-          breed?: string
-          client_id: string
-          created_at?: string
+          age?: number | null
+          breed?: string | null
+          color?: string | null
+          created_at?: string | null
+          gender?: string | null
           id?: string
           name: string
+          neutered?: string | null
+          owner_id: string
           species: string
+          weight?: number | null
         }
         Update: {
-          age?: string
-          breed?: string
-          client_id?: string
-          created_at?: string
+          age?: number | null
+          breed?: string | null
+          color?: string | null
+          created_at?: string | null
+          gender?: string | null
           id?: string
           name?: string
+          neutered?: string | null
+          owner_id?: string
           species?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      service_price_tiers: {
+        Row: {
+          id: string
+          max_weight: number
+          min_weight: number
+          price: number
+          service_id: string
+        }
+        Insert: {
+          id?: string
+          max_weight: number
+          min_weight: number
+          price: number
+          service_id: string
+        }
+        Update: {
+          id?: string
+          max_weight?: number
+          min_weight?: number
+          price?: number
+          service_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pets_client_id_fkey"
-            columns: ["client_id"]
+            foreignKeyName: "service_price_tiers_service_id_fkey"
+            columns: ["service_id"]
             isOneToOne: false
-            referencedRelation: "clients"
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]
+      }
+      services: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          name: string
+          notes: string | null
+          price: number | null
+          pricing_type: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          price?: number | null
+          pricing_type?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          price?: number | null
+          pricing_type?: string
+        }
+        Relationships: []
+      }
+      staff: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          password: string
+          role: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          password: string
+          role?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          password?: string
+          role?: string | null
+          status?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -216,7 +399,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      appointment_status: "incoming" | "pending_client" | "confirmed" | "completed"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -342,9 +525,10 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
-    Enums: {
-      appointment_status: ["incoming", "pending_client", "confirmed", "completed"],
-    },
+    Enums: {},
   },
 } as const

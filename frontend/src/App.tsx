@@ -6,55 +6,102 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAdminStore } from "@/store/adminStore";
 import { useNotificationStore } from "@/store/notificationStore";
 import { realtimeService } from "@/services/realtimeService";
-import { audioManager } from "@/services/audioManager";
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
-import StaffManagement from "./pages/StaffManagement";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
-import Clients from "./pages/Clients";
 import Appointments from "./pages/Appointments";
-import Inventory from "./pages/Inventory";
-import History from "./pages/History";
+import Patients from "./pages/Clients";
+import Billing from "./pages/Billing";
+import Services from "./pages/Services";
+import Supplies from "./pages/Supplies";
+import PetEssentials from "./pages/PetEssentials";
 import Reports from "./pages/Reports";
+import StaffManagement from "./pages/StaffManagement";
+import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+/* Two pages are gone from the routes:
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+   History      — its activity feed moved into Medical Records, which
+                  was then folded into Patients. The route pointed at a
+                  page listing the same visits Patients now shows.
+   MedicalRecords — same story. It duplicated Patients' pet list with a
+                  column Appointments already had.
+
+   Both files can be deleted from src/pages. */
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
+
+function SessionInitializer() {
+  useEffect(() => {
+    useAdminStore.getState().initialize();
+  }, []);
+  return null;
+}
+
+function ProtectedRoute({
+  children, adminOnly = false,
+}: { children: React.ReactNode; adminOnly?: boolean }) {
   const isLoggedIn = useAdminStore((s) => s.isLoggedIn);
-  if (!isLoggedIn) return <Navigate to="/" replace />;
+  const initialized = useAdminStore((s) => s.initialized);
+  const role = useAdminStore((s) => s.role);
+
+  /* Wait for the session check before deciding. Without this, a page
+     refresh bounces a signed-in user to /login for the moment before
+     the session resolves. */
+  if (!initialized) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
+        <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--primary))]" />
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (adminOnly && role !== "admin") return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 function RealtimeInitializer() {
   const isLoggedIn = useAdminStore((s) => s.isLoggedIn);
-  const { soundEnabled, soundVolume } = useNotificationStore();
   const queryClient = useQueryClient();
 
+  /* Depends on isLoggedIn alone.
+
+     It used to also depend on soundEnabled and soundVolume, which meant
+     every change to either tore down the realtime connection and rebuilt
+     it — dropping subscriptions mid-session for a setting that had
+     nothing to do with them. Notification sounds are gone, and so is
+     the problem. */
   useEffect(() => {
-    if (isLoggedIn) {
-      console.log('🚀 Initializing realtime service...');
-      realtimeService.setQueryInvalidator((queryKey) => {
-        queryClient.invalidateQueries({ queryKey });
-      });
-      realtimeService.init();
-      console.log('✅ Realtime service initialized');
-      
-      audioManager.setEnabled(soundEnabled);
-      audioManager.setVolume(soundVolume);
-      console.log('🔊 Audio enabled:', soundEnabled);
-      
-      useNotificationStore.getState().requestPermission();
-      console.log('📢 Notification permission requested');
-    } else {
-      console.log('❌ Not logged in, disconnecting realtime');
+    if (!isLoggedIn) {
       realtimeService.disconnect();
+      return;
     }
-    return () => {
-      realtimeService.disconnect();
-    };
-  }, [isLoggedIn, soundEnabled, soundVolume, queryClient]);
+
+    realtimeService.setQueryInvalidator((queryKey) => {
+      queryClient.invalidateQueries({ queryKey });
+    });
+    realtimeService.init();
+
+    // Browser notifications are separate from sound and stay.
+    useNotificationStore.getState().requestPermission();
+
+    return () => { realtimeService.disconnect(); };
+  }, [isLoggedIn, queryClient]);
 
   return null;
 }
@@ -65,20 +112,43 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <SessionInitializer />
         <RealtimeInitializer />
+
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/staff" element={<ProtectedRoute><StaffManagement /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
-            <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          {/* Inside the router: a crash on one page keeps the URL, so
+              reloading returns to the same screen rather than the
+              dashboard. */}
+          <ErrorBoundary>
+            <Routes>
+              {/* ── Public ── */}
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+
+              {/* ── Clinic ── */}
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
+              <Route path="/clients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
+              <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+              <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
+              <Route path="/supplies" element={<ProtectedRoute><Supplies /></ProtectedRoute>} />
+              <Route path="/pet-essentials" element={<ProtectedRoute><PetEssentials /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+              {/* ── Admin only ── */}
+              <Route path="/staff" element={<ProtectedRoute adminOnly><StaffManagement /></ProtectedRoute>} />
+
+              {/* Old links to these still exist in bookmarks and in the
+                notifications table. Redirect rather than 404. */}
+              <Route path="/history" element={<Navigate to="/clients" replace />} />
+              <Route path="/medical-records" element={<Navigate to="/clients" replace />} />
+
+                <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
