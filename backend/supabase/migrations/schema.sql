@@ -17,6 +17,8 @@ CREATE TABLE public.clients (
   name TEXT NOT NULL,
   contact TEXT NOT NULL,
   email TEXT NOT NULL,
+  address TEXT,
+  facebook_messenger TEXT,
   registered_date DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

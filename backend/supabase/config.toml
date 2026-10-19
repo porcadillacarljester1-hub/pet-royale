@@ -1,4 +1,4 @@
-project_id = "cyooevwoxojotjvsvent"
+project_id = "nsgxclmupdgccrcttugg"
 [functions.create-payment-link]
 enabled = true
 verify_jwt = false

@@ -7,7 +7,7 @@ export async function fetchInventory(): Promise<InventoryItem[]> {
     .select("*")
     .order("name", { ascending: true });
   if (error) throw error;
-  return data || [];
+  return (data || []) as InventoryItem[];
 }
 
 export async function addInventoryItem(item: InventoryInsert): Promise<InventoryItem> {
@@ -21,7 +21,7 @@ export async function addInventoryItem(item: InventoryInsert): Promise<Inventory
     console.error("Add Error:", error.message);
     throw error;
   }
-  return data;
+  return data as InventoryItem;
 }
 
 async function logInventoryChange(entry: {
@@ -64,7 +64,7 @@ export async function updateInventoryItem(id: string, updates: InventoryUpdate, 
     }
   }
 
-  return data;
+  return data as InventoryItem;
 }
 
 export async function deleteInventoryItem(id: string): Promise<void> {

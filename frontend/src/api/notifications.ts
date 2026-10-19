@@ -7,6 +7,37 @@ export interface Notification {
   type: string;
   is_read: boolean;
   created_at: string;
+  // Was already being written on every client-facing notification
+  // (confirmAppointment sets it to the client's own id) but was
+  // never declared here — meaning the admin Notifications screen had
+  // no way to know this field existed at all, let alone filter on it.
+  // Present and set: this notification is addressed to that one
+  // client. Absent or null: it's a staff-facing alert, not tied to
+  // any specific client.
+  client_user_id?: string | null;
+}
+
+/* The one definition of "an appointment alert staff still need to act
+   on" — used by the bell's count AND meant for the Notifications page
+   list, so the badge and the page can never disagree.
+
+   Two rules:
+   1. Staff-facing only. Anything with a client_user_id is addressed to
+      a client ("your appointment is confirmed / completed") and shares
+      this table with staff alerts; it isn't something staff have to
+      handle, so it never counts.
+   2. Not a finished appointment. The row carries no status column, so
+      this falls back to the wording: anything whose title or message
+      says completed or cancelled is skipped. That's a stopgap — the
+      exact fix is to filter on the appointment's own status, which
+      needs the notification to store an appointment_id. */
+export function isAwaitingAppointmentAlert(
+  n: Pick<Notification, "type" | "title" | "message" | "client_user_id">
+): boolean {
+  if (n.type !== "appointment") return false;
+  if (n.client_user_id) return false;
+  const text = `${n.title ?? ""} ${n.message ?? ""}`.toLowerCase();
+  return !/(complet|cancel)/.test(text);
 }
 
 // Ensures created_at is parsed as UTC even if the DB column lacks timezone info.

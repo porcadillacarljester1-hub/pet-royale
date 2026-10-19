@@ -6,7 +6,7 @@ import {
   updateInventoryItem, deleteInventoryItem, uploadProductImage,
 } from "@/api/inventory";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -521,7 +521,7 @@ export default function Supplies() {
                   {editImagePreview
                     ? <img src={editImagePreview} alt="" className="h-full w-full object-contain p-1" />
                     : getProductImage(editItem?.image_key || "")
-                      ? <img src={getProductImage(editItem!.image_key)} alt="" className="h-full w-full object-contain p-1" />
+                      ? <img src={getProductImage(editItem?.image_key || "") ?? undefined} alt="" className="h-full w-full object-contain p-1" />
                       : <Box className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />}
                 </div>
                 <Input type="file" accept="image/*" onChange={(e) => handleImageSelect(e, setEditImageFile, setEditImagePreview)} className={`${FIELD} flex-1`} />

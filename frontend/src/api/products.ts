@@ -7,6 +7,8 @@ export interface Product {
   price: number;
   cost_price: number;
   stock: number;
+  /* Safety stock level: at or below this the product counts as running low. */
+  safety_stock: number;
   description: string | null;
   image_url: string | null;
   is_available: boolean;
@@ -38,6 +40,7 @@ export async function addProduct(input: {
   price: number;
   cost_price?: number;
   stock?: number;
+  safety_stock?: number;
   description: string | null;
   image_url: string | null;
 }) {
@@ -62,6 +65,7 @@ export async function updateProduct(id: string, input: {
   price: number;
   cost_price?: number;
   stock?: number;
+  safety_stock?: number;
   description: string | null;
   image_url: string | null;
 }, changedBy: string | null = null) {

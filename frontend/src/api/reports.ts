@@ -95,13 +95,13 @@ export interface TransactionRow {
 
 export async function fetchReportStats(startDate: string, endDate: string) {
   const [revenueRes, apptRes, itemsRes, clientsRes] = await Promise.all([
-    supabase.from("invoices").select("total_amount, paid_at").eq("status", "paid").gte("paid_at", startDate).lte("paid_at", endDate + "T23:59:59"),
+    (supabase as any).from("invoices").select("total_amount, paid_at").eq("status", "paid").gte("paid_at", startDate).lte("paid_at", endDate + "T23:59:59"),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "completed").gte("requested_date", startDate).lte("requested_date", endDate),
     supabase.from("invoice_items").select("id, invoices!inner(status, paid_at)").eq("invoices.status", "paid").gte("invoices.paid_at", startDate).lte("invoices.paid_at", endDate + "T23:59:59"),
     supabase.from("clients").select("id", { count: "exact", head: true }).gte("created_at", startDate).lte("created_at", endDate + "T23:59:59"),
   ]);
 
-  const totalRevenue = (revenueRes.data || []).reduce((s, i: any) => s + Number(i.total_amount || 0), 0);
+  const totalRevenue = (revenueRes.data || []).reduce((s: number, i: any) => s + Number(i.total_amount || 0), 0);
 
   return {
     totalRevenue,
@@ -112,7 +112,7 @@ export async function fetchReportStats(startDate: string, endDate: string) {
 }
 
 export async function fetchRevenueOverview(startDate: string, endDate: string) {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("invoices")
     .select("total_amount, paid_at")
     .eq("status", "paid")
@@ -192,7 +192,7 @@ export async function fetchTopServices(startDate: string, endDate: string) {
 
 export async function fetchRecentTransactions(limit = 8): Promise<TransactionRow[]> {
   const [invRes, salesRes] = await Promise.all([
-    supabase.from("invoices").select("id, total_amount, paid_at, appointment_id").eq("status", "paid").order("paid_at", { ascending: false }).limit(limit),
+    (supabase as any).from("invoices").select("id, total_amount, paid_at, appointment_id").eq("status", "paid").order("paid_at", { ascending: false }).limit(limit),
     supabase.from("product_sales").select("id, product_name, quantity, total_amount, sold_at").order("sold_at", { ascending: false }).limit(limit),
   ]);
 
