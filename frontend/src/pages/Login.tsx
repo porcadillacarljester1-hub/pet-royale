@@ -12,21 +12,11 @@ import {
 type Step = "login" | "code" | "forgot" | "reset-code" | "new-password";
 type AuthState = "idle" | "checking" | "granted" | "denied";
 
-/* Client-side only, so it slows a person down rather than stopping a
-   script — anyone calling the API directly never sees this. Supabase
-   rate-limits auth server-side, which is the real protection. This
-   stops someone at the keyboard working through a list of guesses. */
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000;
 const ATTEMPTS_KEY = "pr_auth_attempts";
 const LOCKED_UNTIL_KEY = "pr_auth_locked_until";
 
-/* Rules for a NEW password (the reset flow). Signing in with an
-   existing password isn't checked against these — the server decides
-   whether that password is right. Enforced here for a good message
-   at the keyboard; the Supabase project's own password settings
-   (Auth > Providers > Email) should be set to match, since that is
-   the check that can't be bypassed. */
 const PASSWORD_RULES = [
   { label: "At least 12 characters", test: (p: string) => p.length >= 12 },
   { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
@@ -35,9 +25,6 @@ const PASSWORD_RULES = [
   { label: "One symbol, like ! or @", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
 
-/* ── Shared styles ──
-   One button, one heading and one back link, so every step reads as the
-   same screen. The button is the same full pill as the app's sign-in. */
 const BTN =
   "flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[hsl(var(--primary))] text-[17px] font-bold " +
   "text-[hsl(var(--primary-foreground))] shadow-[0_6px_16px_-4px_hsl(var(--primary)/.4)] transition " +
@@ -53,12 +40,6 @@ const LINK =
   "min-h-11 text-[14px] font-bold text-[hsl(var(--primary))] hover:underline " +
   "disabled:text-[hsl(var(--muted-foreground))] disabled:no-underline";
 
-/* ── Field ──
-   Floating label: the label sits inside the field like a placeholder and
-   moves up to the top edge when the field is focused or has something in
-   it, so it never disappears while typing. `right` holds a small control
-   inside the field, like Show / Hide; `labelRight` sits under the field,
-   right-aligned, like "Forgot password?". */
 function FloatField({
   id, label, error, right, labelRight, onFocus, onBlur, ...input
 }: InputHTMLAttributes<HTMLInputElement> & {
@@ -125,8 +106,7 @@ function EyeButton({
 }
 
 function ErrorSlot({ message }: { message: string | null }) {
-  /* Fixed height, so a message appearing doesn't shift the button under
-     a cursor already moving towards it. */
+
   return (
     <div className="min-h-[56px] pt-2">
       {message && (
@@ -139,7 +119,6 @@ function ErrorSlot({ message }: { message: string | null }) {
   );
 }
 
-/* Two-part progress bar for the password and code steps. */
 function StepBar({ step }: { step: 1 | 2 }) {
   return (
     <div className="mb-7 flex gap-2" role="img" aria-label={`Step ${step} of 2`}>
@@ -166,11 +145,6 @@ function recordAuthEvent(email: string, event: string) {
   }]);
 }
 
-/* ── Workspace skeleton ──
-   Shown from the moment the code is accepted until the dashboard takes
-   over, so the hand-off lands on the shape of the dashboard (sidebar, top
-   bar, stat cards, chart and table) rather than a blank screen. Shapes
-   only — it never shows any data, and nothing here gates anything. */
 const SK = "animate-pulse rounded-xl bg-[hsl(var(--muted))] motion-reduce:animate-none";
 
 function WorkspaceSkeleton() {
@@ -284,13 +258,6 @@ function WorkspaceSkeleton() {
   );
 }
 
-/* ── Access overlay ──
-   Covers the whole viewport on the result of an attempt — not just the
-   card — because once verifyOtp succeeds, the auth listener in
-   adminStore sets isLoggedIn and the dashboard starts rendering behind
-   whatever's on screen. Granted hands over to the workspace skeleton;
-   denied is a flash. Both are decoration over a decision already made —
-   nothing here gates anything. */
 function AccessOverlay({ state }: { state: AuthState }) {
   if (state === "granted") return <WorkspaceSkeleton />;
   if (state !== "denied") return null;
@@ -319,12 +286,8 @@ function AccessOverlay({ state }: { state: AuthState }) {
   );
 }
 
-/* A pulsing placeholder in the brand panel's own colours, shown while an
-   image is still downloading. Sized to match the image so nothing jumps. */
 const SKELETON = "animate-pulse bg-white/15 motion-reduce:animate-none";
 
-/* Tracks whether an <img> has finished loading (or failed). Also checks
-   `complete`, because a cached image can finish before onLoad is attached. */
 function useImageReady() {
   const [ready, setReady] = useState(false);
   const ref = useRef<HTMLImageElement | null>(null);
@@ -334,10 +297,6 @@ function useImageReady() {
   return { ready, ref, markReady: () => setReady(true) };
 }
 
-/* One piece of the clinic's lettering, cut from its signboard. While it
-   loads, a placeholder bar of the same width holds its place. If the file
-   is missing it falls back to the same words as plain text, rather than
-   a broken-image icon. */
 function Lettering({
   src, alt, className, fallbackClassName, skeletonHeight,
 }: { src: string; alt: string; className: string; fallbackClassName: string; skeletonHeight: string }) {
@@ -359,11 +318,6 @@ function Lettering({
   );
 }
 
-/* ── Backdrop ──
-   Layered navy panels with gold outlines, and torn gold paper corners
-   with a halftone dot texture, in the style of the clinic's poster. A dot
-   grid, a faint line grid and two soft light streaks add depth. Purely
-   decorative. Kept away from the middle so the form stays the focus. */
 const TORN = {
   trCream: "1036,-4 1044,3 1055,6 1060,18 1072,21 1080,29 1089,36 1099,40 1105,51 1115,56 1127,59 1134,68 1145,72 1152,81 1160,89 1168,96 1178,102 1186,109 1199,110 1207,118 1215,125 1225,131 1234,138 1242,145 1250,154 1259,160 1267,167 1280,169 1286,180 1296,184 1307,188 1314,197 1325,200 1329,215 1342,215 1351,221 1357,231 1370,232 1378,240 1385,250 1394,257 1406,258 1416,264 1423,273 1431,281 1442,285 1448,295 1470,-20 1020,-30",
   trGold: "1040,-10 1047,-0 1058,3 1069,7 1075,17 1087,19 1096,25 1098,42 1110,45 1121,49 1133,51 1142,57 1150,65 1158,73 1166,80 1175,86 1185,92 1191,103 1201,108 1212,110 1219,120 1230,124 1239,130 1248,137 1254,147 1263,154 1277,154 1282,165 1295,167 1299,179 1313,180 1319,189 1330,193 1338,201 1346,210 1356,215 1366,219 1371,231 1384,232 1393,238 1399,249 1412,250 1420,257 1427,268 1441,266 1446,279 1454,286 1470,-20 1020,-30",
@@ -449,9 +403,6 @@ function GeometricBackdrop() {
 const CONDENSED = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 const BEBAS = { fontFamily: CONDENSED } as const;
 
-/* The crest inside a chain of gold-framed diamonds, drawn as one SVG so the
-   frames keep an even border at any size. The crest is clipped to a circle,
-   so a square image file works too. */
 const D_MAIN = "260,15 410,165 260,315 110,165";
 const D_MAIN_IN = "260,38 387,165 260,292 133,165";
 const D_LEFT = "52,121 96,165 52,209 8,165";
@@ -542,10 +493,6 @@ function CrestOrnament() {
   );
 }
 
-/* The clinic's name in the poster's tall condensed lettering: a light-blue
-   to gold gradient with a fine dot texture, over a gold-outlined second
-   line. Drawn as SVG text with a fixed width, so it always fits on two
-   lines whichever condensed font the browser ends up using. */
 function BrandTitle() {
   return (
     <svg
@@ -593,10 +540,6 @@ function BrandTitle() {
   );
 }
 
-/* ── Brand panel ──
-   The crest in its diamonds, the clinic's name, a gold divider and the tagline, centred beside the sign-in card. The
-   divider, tagline and addresses are hidden on small screens. Purely
-   decorative — nothing here touches the sign-in flow. */
 function BrandPanel() {
   return (
     <div className="relative flex min-w-0 flex-col items-center text-center">
@@ -623,20 +566,6 @@ function BrandPanel() {
   );
 }
 
-/* ── Code entry ──
-   Six boxes rather than one field. A single input gives no sense of
-   progress, and someone copying digits from another screen loses their
-   place. Boxes show how many are left, and the behaviours matter more
-   than the look:
-
-     type       fills and advances
-     backspace  clears, or steps back when already empty
-     paste      distributes all six at once — what most people actually
-                do with a code from an email
-     arrows     move between boxes
-     complete   submits on its own; there's nothing else to do at that
-                point, and asking for a click is a step for its own sake
-*/
 function CodeInput({
   value, onChange, onComplete, disabled, invalid,
 }: {
@@ -735,10 +664,6 @@ export default function Login() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning, team" : hour < 18 ? "Good afternoon, team" : "Good evening, team";
 
-  /* Where to go after sign-in: the page they were trying to open when
-     they were sent here (ProtectedRoute passes it along), otherwise
-     /start, which picks a first screen by role and job. Only a plain
-     in-app path is accepted, so nothing can send someone off-site. */
   const returnTo = (() => {
     const from = (location.state as { from?: unknown } | null)?.from;
     return typeof from === "string" && from.startsWith("/") &&
@@ -840,10 +765,6 @@ export default function Login() {
         sessionStorage.removeItem(LOCKED_UNTIL_KEY);
         recordAuthEvent(email, "password_ok");
 
-        /* The password was right, so there IS a session now. Ended
-           before asking for the code — otherwise a stolen password
-           alone would have got someone in, and the second factor would
-           be a formality on an already-open door. */
         await supabase.auth.signOut();
 
         const { error: otpError } = await supabase.auth.signInWithOtp({
@@ -866,10 +787,6 @@ export default function Login() {
         return;
       }
 
-      /* Right password, but the account can't be used (suspended, not
-         activated, or not a staff account). Say so plainly, and don't
-         count it as a wrong-password attempt. Only reachable with the
-         correct password, so it tells a guesser nothing. */
       if (result.code === "inactive" || result.code === "no_access") {
         setError(result.error ?? "This account can't sign in. Please contact the clinic owner.");
         setBadFields({});
@@ -903,9 +820,6 @@ export default function Login() {
     void verifyCode(code);
   };
 
-  /* Takes the code as an argument rather than reading state — when the
-     sixth box triggers this, React hasn't committed the update yet and
-     `code` would still be five digits. */
   const verifyCode = async (raw: string) => {
     setCodeError(null);
     const clean = raw.replace(/\D/g, "");
@@ -985,11 +899,7 @@ export default function Login() {
 
     setResetLoading(true);
     try {
-      /* A code rather than resetPasswordForEmail's link. A link opens
-         wherever it's tapped — usually the phone the email is on — so
-         someone sets their new password there and walks to the desktop
-         to sign in. A code travels to the phone but the reset happens
-         here, on the machine they actually work at. */
+  
       const { error } = await supabase.auth.signInWithOtp({
         email: resetEmail.trim(),
         options: { shouldCreateUser: false },
@@ -1006,9 +916,6 @@ export default function Login() {
     }
   };
 
-  /* Verifying signs them in — that's how Supabase authorises a password
-     change. They're held on the new-password step rather than let
-     through, and backing out signs them straight back out. */
   const verifyResetCode = async (raw: string) => {
     const clean = raw.replace(/\D/g, "");
     if (clean.length !== 6) return;
@@ -1058,9 +965,6 @@ export default function Login() {
       return;
     }
 
-    // They chose this password themselves, so a forced "set your own
-    // password" screen has nothing left to ask. Best effort: if it
-    // fails, that screen simply appears once and clears it.
     await (supabase as any).rpc("complete_password_change");
 
     recordAuthEvent(resetEmail, "otp_ok");
@@ -1068,9 +972,6 @@ export default function Login() {
     window.setTimeout(() => navigate(returnTo, { replace: true }), 1100);
   };
 
-  /* Leaving mid-reset ends the session the code created. Without this,
-     someone could verify a code, back out, and be signed in without
-     ever setting a password. */
   const abandonReset = async () => {
     await supabase.auth.signOut();
     setResetCode("");
@@ -1082,8 +983,6 @@ export default function Login() {
 
   const mmss = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
 
-  /* Gold ring around the card, like the poster's frames. Red after a
-     failed attempt, green once access is granted. */
   const ring =
     authState === "denied" ? "hsl(var(--destructive))"
     : authState === "granted" ? "hsl(145 42% 45%)"
@@ -1099,9 +998,6 @@ export default function Login() {
       />
       <GeometricBackdrop />
 
-      {/* Kept local to this file rather than added to the global
-          stylesheet — nothing else uses them, and a sign-in animation
-          shouldn't be loaded on every screen. */}
       <style>{`
         button:focus-visible {
           outline: 2px solid hsl(var(--primary));
@@ -1170,9 +1066,6 @@ export default function Login() {
         }
       `}</style>
 
-      {/* Navy page: the brand on the left, the sign-in on a cream card on
-          the right. Feedback (denied / granted) is a coloured ring around
-          the card. */}
       <div
         className="relative flex min-h-screen items-center justify-center px-4 pb-14 pt-8"
         style={{
@@ -1256,11 +1149,6 @@ export default function Login() {
                   />
                 </div>
 
-                {/* One shared slot for caps lock and the error, rather
-                    than two stacked. They rarely appear together, and
-                    the error is the more urgent of the two when they
-                    do. Its height is reserved so the button doesn't
-                    jump when a message appears. */}
                 <div className="min-h-[56px]">
                   {error ? (
                     <div role="alert" className="flex items-start gap-2.5 rounded-2xl bg-[hsl(var(--destructive)/.12)] px-3.5 py-3">
@@ -1523,12 +1411,6 @@ export default function Login() {
             </>
           )}
 
-          {/* ── Footer strip ──
-                 Only appears when there's something worth saying: a
-                 warning when the connection isn't secure, or the
-                 running attempt count. On a normal, secure page with
-                 no failed attempts it's not rendered at all, rather
-                 than leaving an empty ruled bar at the bottom. */}
           {(!secure || (attempts > 0 && !locked)) && (
             <div className="mt-6 flex items-center justify-between gap-3 border-t border-[hsl(var(--border)/.7)] pt-4">
               <span className="flex items-center gap-2 text-[13px] font-medium">
