@@ -1,2 +1,10 @@
 node_modules/
 **/.temp/
+.env
+.env.*
+!.env.example
+dist/
+google-services.json
+*service-account*.json
+*.keystore
+*.jks
